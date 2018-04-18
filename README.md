@@ -11,7 +11,7 @@ Feel free to use, copy, share, modify, and distribute this lib under the
 following conditions:
 
 	1:	This file (readme.txt) needs to be included, unmodified, easily 
-	visable, and in its entirety.
+	visible, and in its entirety.
 
 	2:	This library is for non-commercial use only.
 
