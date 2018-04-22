@@ -340,6 +340,8 @@ void setup() {
 	ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
 	//sets pinMode() for all pins to the correct mode
 	initPins();
+	//ensures cmd read is aligned
+	wait();
 }
 
 void loop() {/*avoid overhead*/while (1) {
