@@ -1,22 +1,25 @@
-#define LINE 13 //gamecube controller data line pin
+#define LINE 14 //gamecube controller data line pin
+#define led 15
+#define ledOn digitalWriteFast(led, HIGH)
+#define ledOff digitalWriteFast(led, LOW)
 
 //set your button binds to their corrosponding pin here
-#define BTN_S  1
-#define BTN_Y  2
-#define BTN_X  3
-#define BTN_B  4
-#define BTN_A  5
-#define BTN_L  6
-#define BTN_R  7
-#define BTN_Z  8
-#define BTN_DU 9
-#define BTN_DD 10
-#define BTN_DR 11
-#define BTN_DL 12
-#define A_U 0
-#define A_D 0
-#define A_L 0
-#define A_R 0
+#define BTN_S  8
+#define BTN_Y  9
+#define BTN_X  10
+#define BTN_B  11
+#define BTN_A  12
+#define BTN_L  5
+#define BTN_R  6
+#define BTN_Z  7
+#define BTN_DU 0
+#define BTN_DD 0
+#define BTN_DL 0
+#define BTN_DR 0
+#define A_U 1
+#define A_D 2
+#define A_L 3
+#define A_R 4
 #define C_U 0
 #define C_D 0
 #define C_L 0
@@ -26,28 +29,29 @@
 
 #define CYCLE ARM_DWT_CYCCNT //cpu cycle counter. increments every cpu cycle
 
-uint_fast32_t oldCYCLE;	//temp timing var 
+uint32_t oldCYCLE;	//temp timing var 
 						//(global to reduce memory alocation overhead)
 
 //one bit takes 4us to send
-const uint_fast32_t QUARTER = clockCyclesPerMicrosecond();
-const uint_fast32_t HALF = QUARTER + QUARTER;
-const uint_fast32_t THREEQ = HALF + QUARTER;
-const uint_fast32_t ONE = THREEQ + QUARTER;
-const uint_fast32_t TWO = ONE + ONE;
+const uint32_t QUARTER = clockCyclesPerMicrosecond();
+const uint32_t HALF = QUARTER + QUARTER;
+const uint32_t THREEQ = HALF + QUARTER;
+const uint32_t ONE = THREEQ + QUARTER;
+const uint32_t TWO = ONE + ONE;
 
 //cmd from console. cmd[0] is the actual cmd. (if applicable) cmd[1]
 //is the read mode. (if applicable) cmd[2] is rumble info
 uint8_t cmd[3] = { 0, 0, 0 };
 
 //id of the device to emulate
-const uint8_t id[3] = { 0x09,0x00,0x00 };
+const uint8_t id[3] = { 0b10010000u,0b00000000u,0b00000000u };
 
 //buffer of bytes to be sent to the gamecube
 //we should not ever need to send more than 10 bytes
 uint8_t buffer[10] = {
 	(0b00000100u),(0b00000001u),(0b10000000u),(0b10000000u),
-	(0b10000000u),(0b10000000u),(0b00000001u),(0b00000001u)
+	(0b10000000u),(0b10000000u),(0b00000001u),(0b00000001u),
+	(0b00000000u),(0b00000000u)
 };
 
 //sets buttons pinMode() to INPUT_PULLUP, and LINE to INPUT
@@ -56,9 +60,11 @@ static void initPins() {
 	for (uint8_t i = 0; i < 13; i++) {
 		pinMode(i, INPUT_PULLUP);
 	}
-
+	pinMode(led, OUTPUT);
+	/*
 	//make sure LINE does not end up in INPUT_PULLUP
 	digitalWriteFast(LINE, LOW);
+	*/
 	//set LINE to INPUT by default
 	pinMode(LINE, INPUT);
 }
@@ -87,35 +93,39 @@ static inline void updateBuffer() {
 		((!digitalReadFast(BTN_DL)) << 7);
 
 	//analog stick x axis byte
+	buffer[2] = 128u;
 	if (!digitalReadFast(A_L)) {
-		buffer[2] = (!digitalReadFast(A_R)) ? 128 : 0;
+		buffer[2] = 0u;
 	}
-	else {
-		buffer[2] = (!digitalReadFast(A_R)) ? 255 : 128;
+	else if(!digitalReadFast(A_R)) {
+		buffer[2] = 255u;
 	}
 
+	buffer[3] = 128u;
 	//analog stick y axis byte
+	if (!digitalReadFast(A_U)) {
+		buffer[3] = 0u;
+	}
 	if (!digitalReadFast(A_D)) {
-		buffer[3] = (!digitalReadFast(A_U)) ? 128 : 0;
+		buffer[3] = 255u;
 	}
-	else {
-		buffer[3] = (!digitalReadFast(A_U)) ? 255 : 128;
-	}
-
+	
 	//c stick x axis byte
+	buffer[4] = 128u;
 	if (!digitalReadFast(C_L)) {
-		buffer[4] = (!digitalReadFast(C_R)) ? 128 : 0;
+		buffer[4] = 0u;
 	}
-	else {
-		buffer[4] = (!digitalReadFast(C_R)) ? 255 : 128;
+	if (!digitalReadFast(C_R)) {
+		buffer[4] = 255u;
 	}
 
 	//c stick y axis byte
-	if (!digitalReadFast(C_D)) {
-		buffer[5] = (!digitalReadFast(C_U)) ? 128 : 0;
+	buffer[5] = 128u;
+	if (!digitalReadFast(C_L)) {
+		buffer[5] = 0u;
 	}
-	else {
-		buffer[5] = (!digitalReadFast(C_U)) ? 255 : 128;
+	if (!digitalReadFast(C_R)) {
+		buffer[5] = 255u;
 	}
 
 	//left trigger analog press byte
@@ -156,45 +166,37 @@ static inline void rspInit() {
 //reads cmd from console.
 //responds based on the cmd.
 static inline void readWrite() {
+	updateBuffer();
 	cmd[0] = getByte();
 	//most likely
 	if (cmd[0] == 0x40) {
 		//read cmd has two additional bytes
 		cmd[1] = getByte();
 		cmd[2] = getByte();
-		if (getS()/*stop bit*/) {
-			//pinMode() needs to be OUTPUT mode to write data to LINE
-			pinMode(LINE, OUTPUT);
-			updateBuffer();
-			rspRead();
-		}
-		else {
-			//TODO: figure out what to do in case of no stop bit
-		}
+		getStop();		//stop bit
+		ledOn;
+		//pinMode() needs to be OUTPUT mode to write data to LINE
+		pinMode(LINE, OUTPUT);
+		rspRead();
+		//TODO: figure out what to do in case of no stop bit
 	}
 
 	//origin is 1 one byte
 	else if (cmd[0] == 0x41) {
-		if (getS()/*stop bit*/) {
-			//pinMode() needs to be OUTPUT mode to write data to LINE
-			pinMode(LINE, OUTPUT);
-			rspOrigin();
-		}
-		else {
-			//TODO: figure out what to do in case of no stop bit
-		}
+		getStop();//stop bit
+		//pinMode() needs to be OUTPUT mode to write data to LINE
+		pinMode(LINE, OUTPUT);
+		rspOrigin();
+		//TODO: figure out what to do in case of no stop bit
 	}
 
 	//init cmd is 1 byte
-	else if (cmd[0] == 0x00) {
-		if (getS()/*stop bit*/) {
-			//pinMode() needs to be OUTPUT mode to write data to LINE
-			pinMode(LINE, OUTPUT);
-			rspInit();
-		}
-		else {
-			//TODO: figure out what to do in case of no stop bit
-		}
+	else if (cmd[0] == 0x00 || cmd[0] == 0xff) {
+		getStop();//stop bit
+		//pinMode() needs to be OUTPUT mode to write data to LINE
+		pinMode(LINE, OUTPUT);
+		rspInit();
+		//TODO: figure out what to do in case of no stop bit
 	}
 	else {
 		//TODO: figure out what to do in case of unknown cmd
@@ -202,7 +204,7 @@ static inline void readWrite() {
 		rspRead();
 	}
 	//send controller stop bit
-	sendS();
+	sendStop();
 	//pinMode() set to INPUT by default to lower cmd reading overhead
 	pinMode(LINE, INPUT);
 }
@@ -224,7 +226,7 @@ static inline bool getBit() {
 
 //reads for console stop bit (3us or THREEQ)
 //(assumes pin is already INPUT)
-static inline bool getS() {
+static inline bool getStop() {
 	while (digitalReadFast(LINE)) {
 		//wait for line to drop, signaling the start of a new bit
 	}
@@ -242,16 +244,15 @@ static inline bool getS() {
 static inline uint8_t getByte() {
 	uint8_t byt;
 	for (uint8_t i = 0; i < 8; i++) {
-		//shifts byt over by 1 bit to make room for the next
-		byt <<= 1;
+		//shifts byt over by 1 bit to make room for the next then
 		//bitwise or with the bit read from LINE
-		byt |= getBit();
+		byt = (byt << 1) | getBit();
 	}
 	return byt;
 }
 
 //writes a controller stop bit to LINE (assumes pin is already OUTPUT)
-static inline void sendS() {
+static inline void sendStop() {
 	//write LOW for 2us
 	digitalWriteFast(LINE, LOW);
 	oldCYCLE = CYCLE;
@@ -306,9 +307,9 @@ static inline void send0() {
 static inline void sendByte(uint8_t byt) {
 	for (uint8_t i = 0; i < 8; i++) {
 		//sends the least significant bit
-		byt & 1 ? send1() : send0();
+		byt & 0b1u ? send1() : send0();
 		//shifts the significant bit out
-		byt >>= 1;
+		byt = byt >> 1;
 	}
 }
 
@@ -344,6 +345,7 @@ void setup() {
 	wait();
 }
 
+uint8_t cnt;
 void loop() {/*avoid overhead*/while (1) {
 	readWrite();
 }}
