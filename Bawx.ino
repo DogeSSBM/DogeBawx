@@ -30,36 +30,6 @@ u32 tempCycle;						// temp var to store CPU cycle
 #define elapsedCycles() (cycReg - tempCycle)	// number of CPU cycles elapsed
 								// since markCycle() was recorded
 
-struct {
-	// byte 1
-	u8 errStat : 1;				// send first
-	u8 errLatch : 1;
-	u8 origin : 1;
-	u8 S : 1;	// Start
-	u8 Y : 1;
-	u8 X : 1;
-	u8 B : 1;
-	u8 A : 1;					// send last
-
-	// byte 2
-	u8 high1 : 1;				// send first
-	u8 L : 1;	// Digital L Trigger
-	u8 R : 1;	// Digital R Trigger
-	u8 Z : 1;
-	u8 Du : 1;	// D-pad Up
-	u8 Dd : 1;	// D-pad Down
-	u8 Dr : 1;	// D-pad Right
-	u8 Dl : 1;	// D-pad Left		send last
-
-	// byte 3 - byte 8
-	u8 ax;	// Left analog stick x axis
-	u8 ay;	// Left analog stick Y axis
-	u8 cx;	// C analog stick x axis
-	u8 cy;	// C analog stick y axis
-	u8 l;		// Analog L Trigger
-	u8 r;		// Analog R Trigger
-}report;
-
 // CMD read from console
 struct {
 	u8 cmd;					// CMD from console
