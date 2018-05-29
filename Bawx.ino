@@ -153,7 +153,7 @@ Du Dd Dr Dl
 8  9  10 11
 
 Al Ar Au Ad
-12 13 14 15
+12 22 14 15
 
 Cl Cr Cu Cd
 16 17 18 19
