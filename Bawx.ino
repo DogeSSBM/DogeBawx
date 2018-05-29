@@ -166,8 +166,6 @@ La Ra
 // (assumes button pin modes are already INPUT)
 inline void read()
 {
-	int32_t dir = 1;					// used to calculate direction of analog stick
-
 	// buttons first byte
 	buff[0] = 0 |
 		((!digitalReadFast( 0)) << 4) |	// Start
