@@ -1,42 +1,44 @@
-//typedef shortcuts (ignore these)
+#define LINE 23							// controller data line pin
+
+// macros for inttypes
 #define u8 uint8_t
 #define u16 uint16_t
 #define u32 uint32_t
 #define u64 uint64_t
 
-#define LINE 23						// gamecube controller data line pin
-const u8 id[3] = { 0x09,0x00,0x00 };		// ID to send in response to
-								// init CMD
-// buffer to be sent to console
-// last 2 bytes only sent in response to origin CMD (must be 0x02 for some reason)
+const u8 id[3] = { 0x09,0x00,0x00 };	// ID to send in response to
+							// init CMD
+							// buffer to be sent to console
+							// last 2 bytes only sent in response to origin CMD (must be 0x02 for some reason)
 u8 buff[10] = { 0x00,0x80,0x80,0x80,0x80,0x80,0x01,0x01,0x02,0x02 };
 
 // one bit takes 4us to read/write
 // quarterBit = number of CPU cycles in 1us
-const u32 _quarterBit = F_CPU / 1000000;		// 1/4 bit takes this number of
-								// cycles to read/write
-const u32 _halfBit = _quarterBit * 2;		// 1/2 bit takes this number of
-								// cycles to read/write
-const u32 _threeqBit = _halfBit + _quarterBit;	// 3/4 bit takes this number of
-								// cycles to read/write
-const u32 _oneBit = _halfBit * 2;			// 1 bit takes this number of
-								// cycles to read/write
-const u32 _twoBit = _oneBit * 2;			// 2 bits take this number of
-								// cycles to read/write
-u32 tempCycle;						// temp var to store CPU cycle
-#define cycReg (ARM_DWT_CYCCNT)			// CPU Cycle count Register
-#define markCycle() (tempCycle = cycReg)		// record the current CPU cycle
-								// for use later
-#define elapsedCycles() (cycReg - tempCycle)	// number of CPU cycles elapsed
-								// since markCycle() was recorded
+const u32 _quarterBit = F_CPU / 1000000;	// 1/4 bit takes this number of
+							// cycles to read/write
+const u32 _halfBit = _quarterBit * 2;	// 1/2 bit takes this number of
+							// cycles to read/write
+const u32 _threeqBit = _quarterBit * 3;	// 3/4 bit takes this number of
+							// cycles to read/write
+const u32 _oneBit = _quarterBit * 4;	// 1 bit takes this number of
+							// cycles to read/write
+const u32 _twoBit = _oneBit * 2;		// 2 bits take this number of
+							// cycles to read/write
+u32 tempCycle;					// temp var to store CPU cycle
+
+// record the current CPU cycle
+// (ARM_DWT_CYCCNT) = CPU Cycle count Register
+#define markCycle() (tempCycle = (ARM_DWT_CYCCNT))
+
+// number of CPU cycles elapsed
+// since markCycle() was recorded
+#define elapsedCycles() ((ARM_DWT_CYCCNT) - tempCycle)
 
 // CMD read from console
 struct {
-	u8 cmd;					// CMD from console
-	u8 readMode;				// appears after read CMD (0x40)
-	u8 rumbleInfo;				// appears after readMode, after read CMD
-	bool unknownCmd;				// TRUE if CMD matches no known CMDs
-							// remains TRUE, until reset by user
+	u8 cmd;		// CMD from console
+	u8 readMode;	// appears after read CMD (0x40)
+	u8 rumbleInfo;	// appears after readMode, after read CMD
 }cmd;
 
 // reads and returns one bit from LINE
@@ -46,7 +48,7 @@ inline bool readBit()
 	while (digitalReadFast(LINE)) {
 		// start of bit starts on falling edge
 	}
-	markCycle();			//record CPU cycle of falling edge
+	markCycle();// record CPU cycle of falling edge
 	while (!digitalReadFast(LINE)) {
 		// bit value is determined by how long LINE is held LOW by the console
 	}
@@ -59,7 +61,7 @@ inline bool readBit()
 // (assumes LINE is already OUTPUT)
 inline void writeBit(bool bt /* bit to be written */)
 {
-	markCycle();	// record CPU cycle of the start of the bit
+	markCycle();// record CPU cycle of the start of the bit
 	if (bt) {
 		digitalWriteFast(LINE, LOW);
 		while (elapsedCycles() < _quarterBit) {
@@ -98,8 +100,8 @@ inline void writeByte(u8 byt /* byte to be written */)
 // (assumes LINE is already INPUT)
 inline u8 readByte()
 {
-	u8 byt;		// byte being read
-				// Console sends MSB first
+	u8 byt;			// byte being read
+					// Console sends MSB first
 	for (u8 i; i < 8; i++) {
 		byt = (byt << 1) | readBit();
 	}
@@ -109,10 +111,11 @@ inline u8 readByte()
 // waits for almost 2 init probes
 inline void align()
 {
-	u16 buffer = 0xffff;				// temp buffer to store bits
-	delay(100);						// delay long enough for console to
-								// probe for attached controller
 	pinMode(LINE, INPUT);
+	u16 buffer = 0xffff;	// temp buffer to store bits
+	delay(100);			// delay long enough for console to
+					// probe for attached controller
+
 	// wait for buffer to match nearly 2 probes
 	while (buffer != 0b0000001000000001) {
 		buffer = (buffer << 1) | readBit();
@@ -168,50 +171,58 @@ inline void read()
 {
 	// buttons first byte
 	buff[0] = 0 |
-		((!digitalReadFast( 0)) << 4) |	// Start
-		((!digitalReadFast( 1)) << 3) |	// Y
-		((!digitalReadFast( 2)) << 2) |	// X
-		((!digitalReadFast( 3)) << 1) |	// B
-		((!digitalReadFast( 4)) << 0) ;	// A
-	
-	// buttons second byte
-	buff[1] = 0 | 
-		((!digitalReadFast( 5)) << 6) |	// L
-		((!digitalReadFast( 6)) << 5) |	// R
-		((!digitalReadFast( 7)) << 4) |	// Z
-		((!digitalReadFast( 8)) << 3) |	// Dpad-Up
-		((!digitalReadFast( 9)) << 2) |	// Dpad-Down
-		((!digitalReadFast(10)) << 1) |	// Dpad-Right
-		((!digitalReadFast(11)) << 0) ;	// Dpad-Left
+		((!digitalReadFast(0)) << 4) |	// Start
+		((!digitalReadFast(1)) << 3) |	// Y
+		((!digitalReadFast(2)) << 2) |	// X
+		((!digitalReadFast(3)) << 1) |	// B
+		((!digitalReadFast(4)) << 0);	// A
 
-	// analog stick X axis byte
-	if (!digitalReadFast(12)) {					// A-Left
-		buff[2] = !digitalReadFast(22) ? 128 : 0;		// A-Right
+							// buttons second byte
+	buff[1] = 0 |
+		((!digitalReadFast(5)) << 6) |	// L
+		((!digitalReadFast(6)) << 5) |	// R
+		((!digitalReadFast(7)) << 4) |	// Z
+		((!digitalReadFast(8)) << 3) |	// Dpad-Up
+		((!digitalReadFast(9)) << 2) |	// Dpad-Down
+		((!digitalReadFast(10)) << 1) |	// Dpad-Right
+		((!digitalReadFast(11)) << 0);	// Dpad-Left
+
+								// analog stick X axis byte
+	if (!digitalReadFast(12)) {			// A-Left
+		buff[2] = !digitalReadFast(22) ? 128 : 0;
+								// A-Right
 	}
 	else {
-		buff[2] = !digitalReadFast(22) ? 255 : 128;	// A-Right
+		buff[2] = !digitalReadFast(22) ? 255 : 128;
+								// A-Right
 	}
 	// analog sick Y axis byte
-	if (!digitalReadFast(14)) {					// A-Up
-		buff[3] = !digitalReadFast(15) ? 128 : 255;	// A-Down
+	if (!digitalReadFast(14)) {			// A-Up
+		buff[3] = !digitalReadFast(15) ? 128 : 255;
+								// A-Down
 	}
 	else {
-		buff[3] = !digitalReadFast(15) ? 0 : 128;		// A-Down
+		buff[3] = !digitalReadFast(15) ? 0 : 128;
+								// A-Down
 	}
 
 	// C stick X axis byte
-	if (!digitalReadFast(16)) {					// C-Left
-		buff[4] = !digitalReadFast(17) ? 128 : 0;		// C-Right
+	if (!digitalReadFast(16)) {			// C-Left
+		buff[4] = !digitalReadFast(17) ? 128 : 0;
+								// C-Right
 	}
 	else {
-		buff[4] = !digitalReadFast(17) ? 255 : 128;	// C-Right
+		buff[4] = !digitalReadFast(17) ? 255 : 128;
+								// C-Right
 	}
 	// C sick Y axis byte
-	if (!digitalReadFast(18)) {					// C-Up
-		buff[5] = !digitalReadFast(19) ? 128 : 255;	// C-Down
+	if (!digitalReadFast(18)) {			// C-Up
+		buff[5] = !digitalReadFast(19) ? 128 : 255;
+								// C-Down
 	}
 	else {
-		buff[5] = !digitalReadFast(19) ? 0 : 128;		// C-Down
+		buff[5] = !digitalReadFast(19) ? 0 : 128;
+								// C-Down
 	}
 
 	// Left trigger analog byte
@@ -233,7 +244,7 @@ inline void respond()
 
 	// origin CMD
 	else if (cmd.cmd == 0x41) {
-		buff[0] &= 0b11111011;				//set origin bit
+		buff[0] &= 0b11111011;			//set origin bit
 		for (uint8_t i = 0; i < 10; i++) {
 			writeByte(buff[i]);
 		}
@@ -279,7 +290,7 @@ inline void initBtns()
 	pinMode(LINE, INPUT);
 }
 
-// gets everything ready				// sets up cpu cycle counter register
+// gets everything ready
 inline void init()
 {
 	initCounter();					// sets up cpu cycle counter register
@@ -291,10 +302,6 @@ inline void init()
 
 void setup()
 {
-	/*Serial.begin(9600);
-	Serial.println("Hi number 1");
-	delay(1000);
-	Serial.println("Hi number 2\n");*/
 	init();
 }
 
