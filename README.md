@@ -24,4 +24,4 @@ following conditions:
 	anything that happens involving this library.
 
 Please contact @GoodDoge#9968 in this discord server if you want to help
-or need help with this project. https://discord.gg/vMPraU8
+or need help with this project. https://discord.gg/BG4cpTe
